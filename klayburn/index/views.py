@@ -15,9 +15,9 @@ def index(request):
     return render(request, 'index.html', context=context)
 
 
-def block_member(request, primary_key):
+def block_member(request, pk):
     try:
-        member = Member.objects.get(pk=primary_key)
+        member = Member.objects.get(pk=pk)
 
     except Member.DoesNotExist:
         raise Http404('Member does not exist')
