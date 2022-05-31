@@ -1,7 +1,5 @@
 from django.db import models
 
-# Create your models here.
-
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
@@ -20,12 +18,30 @@ class BlockData(models.Model):
     date = models.DateField()
     amount = models.PositiveIntegerField()
 
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return str(self.member) + str(self.date)
+
 
 class TransactionData(models.Model):
     date = models.DateField()
     amount = models.PositiveBigIntegerField()
 
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return str(self.date)
+
 
 class GasFeeData(models.Model):
     date = models.DateField()
     amount = models.FloatField()
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return str(self.date)
