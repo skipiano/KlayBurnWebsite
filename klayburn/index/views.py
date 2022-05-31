@@ -3,6 +3,10 @@ from .models import Member
 from django.views import generic
 
 
+class BlockView(generic.ListView):
+    model = Member
+
+
 def index(request):
 
     context = {}
@@ -18,8 +22,14 @@ def block_member(request, primary_key):
     except Member.DoesNotExist:
         raise Http404('Member does not exist')
 
-    return render(request, 'index/block_member.html')
+    return render(request, 'index/graph.html')
 
 
-class BlockView(generic.ListView):
-    model = Member
+def transaction(request):
+
+    return render(request, 'index/graph.html')
+
+
+def gas_fee(request):
+
+    return render(request, 'index/graph.html')
