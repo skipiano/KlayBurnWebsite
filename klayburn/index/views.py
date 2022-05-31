@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Member
+from .models import Member, BlockData, TransactionData, GasFeeData
 from django.views import generic
 import matplotlib
 import matplotlib.pyplot as plt

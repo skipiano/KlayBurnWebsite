@@ -13,3 +13,19 @@ class Member(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class BlockData(models.Model):
+    member = models.ForeignKey('Member', on_delete=models.SET_NULL, null=True)
+    date = models.DateField()
+    amount = models.PositiveIntegerField()
+
+
+class TransactionData(models.Model):
+    date = models.DateField()
+    amount = models.PositiveBigIntegerField()
+
+
+class GasFeeData(models.Model):
+    date = models.DateField()
+    amount = models.FloatField()
