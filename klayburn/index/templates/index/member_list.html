@@ -1,0 +1,17 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Klaytn Governance Council (KGC) Member List</h1>
+<h3>Click the link to get the daily block count of the respective KGC member!</h3>
+{% if member_list %}
+<ul>
+    {% for member in member_list %}
+    <li>
+        <a href="{% url 'block' %} {{ member.address }}">{{ member.name }}</a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>There are no KGC members.</p>
+{% endif %}
+{% endblock %}
