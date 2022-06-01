@@ -19,7 +19,7 @@ class BlockData(models.Model):
     amount = models.PositiveIntegerField()
 
     class Meta:
-        ordering = ['date']
+        ordering = ['date', 'member']
 
     def __str__(self):
         return str(self.member) + str(self.date)
