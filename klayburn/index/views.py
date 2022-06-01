@@ -9,6 +9,8 @@ import datetime
 import pandas as pd
 import csv
 from django.utils.encoding import smart_str
+from django.urls import reverse
+from django.http import HttpResponse
 matplotlib.use('Agg')
 
 
@@ -33,7 +35,7 @@ def block_member(request, pk):
             member__exact=member)]
         end_date = block_data[-1].date
         context = define_context(block_amount_data,
-                                 end_date, member.name + " Blocks", "Blocks")
+                                 end_date, member.name + " Blocks", "Blocks", "block-download")
     except Member.DoesNotExist:
         raise Http404('Member does not exist')
 
@@ -47,7 +49,7 @@ def transaction(request):
         transaction.amount for transaction in TransactionData.objects.all()]
     end_date = transaction_data[-1].date
     context = define_context(transaction_amount_data,
-                             end_date, "Transactions", "Transactions")
+                             end_date, "Transactions", "Transactions", "transaction-download")
 
     return render(request, 'index/graph_csv.html', context=context)
 
@@ -59,7 +61,7 @@ def gas_fee(request):
         gas.amount for gas in GasFeeData.objects.all()]
     end_date = gas_data[-1].date
     context = define_context(gas_amount_data,
-                             end_date, "Gas Fees", "Gas ($KLAY)")
+                             end_date, "Gas Fees", "Gas ($KLAY)", "gas-download")
     return render(request, 'index/graph_csv.html', context=context)
 
 
@@ -77,7 +79,7 @@ def encode_graph(data, start_date, end_date, start_ind, label):
     return base64.b64encode(flike.getvalue()).decode()
 
 
-def define_context(data, end_date, title, label):
+def define_context(data, end_date, title, label, download):
     context = {}
     start_all_date = datetime.datetime(2019, 6, 25)
     start_year_date = end_date - datetime.timedelta(days=365)
@@ -89,6 +91,7 @@ def define_context(data, end_date, title, label):
     context['chart_month'] = encode_graph(
         data, start_month_date, end_date, -31, label)
     context['title'] = title
+    context['download'] = reverse(download)
     return context
 
 
@@ -101,7 +104,7 @@ def block_download(request):
     for member in Member.objects.all():
         headers.append(smart_str(member.name))
     writer.writerow(headers)
-    start_date = datetime.datetime(2019, 6, 25)
+    start_date = datetime.date(2019, 6, 25)
     block_data = [blocks for blocks in BlockData.objects.filter(
         member__exact=member)]
     end_date = block_data[-1].date
@@ -126,7 +129,7 @@ def transaction_download(request):
 
 def gas_fee_download(request):
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
+    response['Content-Disposition'] = 'attachment; filename="gas_fees.csv"'
     writer = csv.writer(response, csv.excel)
     response.write(u'\ufeff'.encode('utf8'))
     writer.writerow([smart_str(u"Date"), smart_str(u"Gas ($KLAY)")])

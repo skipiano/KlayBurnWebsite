@@ -17,8 +17,10 @@
     {% endif %}
     {% endfor %}
 </ul>
+<br>
+<a href="{% url 'block-download' %}">Download CSV File</a>
 {% else %}
 <p>There are no KGC members.</p>
 {% endif %}
-<h3>Download CSV File</h3>
+
 {% endblock %}
