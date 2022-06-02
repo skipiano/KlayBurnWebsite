@@ -11,4 +11,5 @@ urlpatterns = [
          name='transaction-download'),
     path('gas_fee/', views.gas_fee, name='gas'),
     path('gas_fee/download', views.gas_fee_download, name='gas-download'),
+    path('update', views.update, name='update'),
 ]
