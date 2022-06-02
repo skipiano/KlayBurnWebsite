@@ -15,6 +15,9 @@ from django.urls import reverse
 from django.http import HttpResponse
 import requests
 import time
+import asyncio
+import aiohttp
+from asgiref.sync import sync_to_async
 from dateutil.relativedelta import relativedelta
 
 matplotlib.use('Agg')
@@ -140,9 +143,10 @@ def gas_fee_download(request):
     return response
 
 
-def update(request):
+async def update(request):
     starting_time = time.time()
-    start_date = get_end_date()+datetime.timedelta(days=1)
+    start_date = await get_end_date_async()
+    start_date = start_date+datetime.timedelta(days=1)
     end_date = datetime.date.today()-datetime.timedelta(days=1)
     if start_date <= end_date:
         start_month = datetime.datetime(start_date.year, start_date.month, 1)
@@ -150,42 +154,39 @@ def update(request):
         date_delta = end_date - start_date
         num_days = date_delta.days + 1
         block_list_dict = {}
-        for member in Member.objects.all():
+        members = await get_all_members()
+        for member in members:
             block_list_dict[member.name] = np.zeros(num_days, dtype=np.uint32)
         transaction_list = np.zeros(num_days, dtype=np.uint64)
         gas_fee_list = np.zeros(num_days)
         head = {"referer": "https://scope.klaytn.com/"}
         request_link1 = "https://api-cypress-v2.scope.klaytn.com/v2/accounts/"
         request_link2 = "/blocks/download?date="
-        while start_month <= end_month:
-            print(datetime.datetime.strftime(start_month, "%Y-%m"))
-            # load all of the csv files for a KGC member, then iterate over
-            for member in Member.objects.all():
-                print(member.name)
-                try:
-                    if not member.active:
-                        continue
-                    response = requests.get(
-                        request_link1 + member.address + request_link2 + datetime.datetime.strftime(start_month, "%Y-%m"), headers=head)
-                    if response.text and response.text[0] != "<":
-                        df = pd.read_csv(StringIO(response.text),
-                                         usecols=[1, 2, 3])
-                        df.apply(lambda row: collect_data_from_row(
-                            row, block_list_dict, transaction_list, gas_fee_list, start_date, member.name), axis=1)
-                except Exception:
-                    pass
-            start_month = start_month + relativedelta(months=1)
-        print(block_list_dict)
-        print(transaction_list)
-        print(gas_fee_list)
+        async with aiohttp.ClientSession() as session:
+            while start_month <= end_month:
+                print(datetime.datetime.strftime(start_month, "%Y-%m"))
+                # load all of the csv files for a KGC member, then iterate over
+                for member in members:
+                    print(member.name)
+                    try:
+                        if not member.active:
+                            continue
+                        async with session.get(request_link1 + member.address + request_link2 + datetime.datetime.strftime(start_month, "%Y-%m"), headers=head) as resp:
+                            data = await resp.text()
+                            if data and data[0] != "<":
+                                df = pd.read_csv(StringIO(data),
+                                                 usecols=[1, 2, 3])
+                                df.apply(lambda row: collect_data_from_row(
+                                    row, block_list_dict, transaction_list, gas_fee_list, start_date, member.name), axis=1)
+                    except Exception:
+                        pass
+                start_month = start_month + relativedelta(months=1)
         for i in range(num_days):
             cur_date = start_date+datetime.timedelta(days=i)
-            for member in Member.objects.all():
-                BlockData.objects.create(
-                    member=member, date=cur_date, amount=block_list_dict[member.name][i])
-            TransactionData.objects.create(
-                date=cur_date, amount=transaction_list[i])
-            GasFeeData.objects.create(date=cur_date, amount=gas_fee_list[i])
+            for member in members:
+                await create_block_data(member, cur_date, block_list_dict[member.name][i])
+            await create_transaction_data(cur_date, transaction_list[i])
+            await create_gas_fee_data(cur_date, gas_fee_list[i])
     total_time = time.time() - starting_time
     return render(request, 'index/update.html', context={"time": total_time})
 
@@ -196,6 +197,11 @@ def get_end_date():
     return transaction_data[-1].date
 
 
+@sync_to_async
+def get_end_date_async():
+    return get_end_date()
+
+
 def collect_data_from_row(row, block_list_dict, transaction_list, gas_fee_list, start_date, address_name):
     cur_date = (datetime.datetime.strptime(row[0][:10], "%Y-%m-%d")).date()
     if cur_date >= start_date:
@@ -204,3 +210,27 @@ def collect_data_from_row(row, block_list_dict, transaction_list, gas_fee_list, 
         block_list_dict[address_name][days_ind] = block_list_dict[address_name][days_ind] + 1
         transaction_list[days_ind] = transaction_list[days_ind] + int(row[1])
         gas_fee_list[days_ind] = gas_fee_list[days_ind] + float(row[2]) - 9.6
+
+
+async def test(request):
+    return request
+
+
+@sync_to_async
+def get_all_members():
+    return list(Member.objects.all())
+
+
+@sync_to_async
+def create_block_data(member, date, amount):
+    BlockData.objects.create(member=member, date=date, amount=amount)
+
+
+@sync_to_async
+def create_transaction_data(date, amount):
+    TransactionData.objects.create(date=date, amount=amount)
+
+
+@sync_to_async
+def create_gas_fee_data(date, amount):
+    GasFeeData.objects.create(date=date, amount=amount)
