@@ -159,28 +159,22 @@ async def update(request):
             block_list_dict[member.name] = np.zeros(num_days, dtype=np.uint32)
         transaction_list = np.zeros(num_days, dtype=np.uint64)
         gas_fee_list = np.zeros(num_days)
-        head = {"referer": "https://scope.klaytn.com/"}
         request_link1 = "https://api-cypress-v2.scope.klaytn.com/v2/accounts/"
         request_link2 = "/blocks/download?date="
         async with aiohttp.ClientSession() as session:
+            tasks = []
             while start_month <= end_month:
-                print(datetime.datetime.strftime(start_month, "%Y-%m"))
-                # load all of the csv files for a KGC member, then iterate over
                 for member in members:
-                    print(member.name)
-                    try:
-                        if not member.active:
-                            continue
-                        async with session.get(request_link1 + member.address + request_link2 + datetime.datetime.strftime(start_month, "%Y-%m"), headers=head) as resp:
-                            data = await resp.text()
-                            if data and data[0] != "<":
-                                df = pd.read_csv(StringIO(data),
-                                                 usecols=[1, 2, 3])
-                                df.apply(lambda row: collect_data_from_row(
-                                    row, block_list_dict, transaction_list, gas_fee_list, start_date, member.name), axis=1)
-                    except Exception:
-                        pass
+                    if not member.active:
+                        continue
+                    url = request_link1 + member.address + request_link2 + \
+                        datetime.datetime.strftime(start_month, "%Y-%m")
+                    task = asyncio.ensure_future(download(
+                        session, url, block_list_dict, transaction_list, gas_fee_list, start_date, member))
+                    tasks.append(task)
                 start_month = start_month + relativedelta(months=1)
+            # debug make this fale
+            await asyncio.gather(*tasks, return_exceptions=True)
         for i in range(num_days):
             cur_date = start_date+datetime.timedelta(days=i)
             for member in members:
@@ -212,10 +206,6 @@ def collect_data_from_row(row, block_list_dict, transaction_list, gas_fee_list, 
         gas_fee_list[days_ind] = gas_fee_list[days_ind] + float(row[2]) - 9.6
 
 
-async def test(request):
-    return request
-
-
 @sync_to_async
 def get_all_members():
     return list(Member.objects.all())
@@ -234,3 +224,14 @@ def create_transaction_data(date, amount):
 @sync_to_async
 def create_gas_fee_data(date, amount):
     GasFeeData.objects.create(date=date, amount=amount)
+
+
+async def download(session, url, block_list_dict, transaction_list, gas_fee_list, start_date, member):
+    head = {"referer": "https://scope.klaytn.com/"}
+    async with session.get(url, headers=head) as response:
+        data = await response.text()
+        if data and data[0] != "<":
+            df = pd.read_csv(StringIO(data),
+                             usecols=[1, 2, 3])
+            df.apply(lambda row: collect_data_from_row(
+                row, block_list_dict, transaction_list, gas_fee_list, start_date, member.name), axis=1)
