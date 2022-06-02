@@ -43,11 +43,11 @@ def block_member(request, pk):
             member__exact=member)]
         end_date = get_end_date()
         context = define_context(block_amount_data,
-                                 end_date, member.name + " Blocks", "Blocks", "block-download")
+                                 end_date, member.name + " Blocks", "Blocks", "block-member-download", member.address)
     except Member.DoesNotExist:
         raise Http404('Member does not exist')
 
-    return render(request, 'index/graph.html', context=context)
+    return render(request, 'index/graph_csv.html', context=context)
 
 
 def transaction(request):
@@ -55,7 +55,7 @@ def transaction(request):
         transaction.amount for transaction in TransactionData.objects.all()]
     end_date = get_end_date()
     context = define_context(transaction_amount_data,
-                             end_date, "Transactions", "Transactions", "transaction-download")
+                             end_date, "Transactions", "Transactions", "transaction-download", "")
 
     return render(request, 'index/graph_csv.html', context=context)
 
@@ -65,7 +65,7 @@ def gas_fee(request):
         gas.amount for gas in GasFeeData.objects.all()]
     end_date = get_end_date()
     context = define_context(gas_amount_data,
-                             end_date, "Gas Fees", "Gas ($KLAY)", "gas-download")
+                             end_date, "Gas Fees", "Gas ($KLAY)", "gas-download", "")
     return render(request, 'index/graph_csv.html', context=context)
 
 
@@ -84,7 +84,7 @@ def encode_graph(data, start_date, end_date, start_ind, label):
     return base64.b64encode(flike.getvalue()).decode()
 
 
-def define_context(data, end_date, title, label, download):
+def define_context(data, end_date, title, label, download, id):
     context = {}
     start_all_date = datetime.datetime(2019, 6, 25)
     start_year_date = end_date - datetime.timedelta(days=365)
@@ -96,7 +96,10 @@ def define_context(data, end_date, title, label, download):
     context['chart_month'] = encode_graph(
         data, start_month_date, end_date, -31, label)
     context['title'] = title
-    context['download'] = reverse(download)
+    if id:
+        context['download'] = reverse(download, args=[id])
+    else:
+        context['download'] = reverse(download)
     return context
 
 
@@ -143,6 +146,22 @@ def gas_fee_download(request):
     return response
 
 
+def block_member_download(request, pk):
+    try:
+        member = Member.objects.get(pk=pk)
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="' + \
+            member.name + '_blocks.csv"'
+        writer = csv.writer(response, csv.excel)
+        response.write(u'\ufeff'.encode('utf8'))
+        writer.writerow([smart_str(u"Date"), smart_str(u"Blocks")])
+        for blocks in BlockData.objects.filter(member=member):
+            writer.writerow([smart_str(blocks.date), smart_str(blocks.amount)])
+        return response
+    except Member.DoesNotExist:
+        raise Http404('Member does not exist')
+
+
 async def update(request):
     starting_time = time.time()
     start_date = await get_end_date_async()
@@ -173,8 +192,7 @@ async def update(request):
                         session, url, block_list_dict, transaction_list, gas_fee_list, start_date, member))
                     tasks.append(task)
                 start_month = start_month + relativedelta(months=1)
-            # debug make this fale
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=False)
         for i in range(num_days):
             cur_date = start_date+datetime.timedelta(days=i)
             for member in members:

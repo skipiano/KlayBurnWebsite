@@ -6,6 +6,8 @@ urlpatterns = [
     path('blocks/', views.BlockView.as_view(), name='block'),
     path('blocks/download', views.block_download, name='block-download'),
     path('blocks/<str:pk>', views.block_member, name='block-member'),
+    path('blocks/<str:pk>/download', views.block_member_download,
+         name='block-member-download'),
     path('transactions/', views.transaction, name='transaction'),
     path('transactions/download', views.transaction_download,
          name='transaction-download'),
