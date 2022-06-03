@@ -206,7 +206,10 @@ async def update(request):
 def get_end_date():
     transaction_data = [
         transaction for transaction in TransactionData.objects.all()]
-    return transaction_data[-1].date
+    if transaction_data:
+        return transaction_data[-1].date
+    else:
+        return datetime.date(2019, 6, 25)
 
 
 @sync_to_async
